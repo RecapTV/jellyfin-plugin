@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Jellyfin.Plugin.RecapTV</RootNamespace>
+    <AssemblyName>Jellyfin.Plugin.RecapTV</AssemblyName>
+    <Version>0.1.0</Version>
+    <RecapTVApiBaseUrl Condition="'$(RecapTVApiBaseUrl)' == ''">$(RECAPTV_API_BASE_URL)</RecapTVApiBaseUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.11" ExcludeAssets="runtime" />
+    <PackageReference Include="Jellyfin.Model" Version="10.11.11" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="RecapTVApiBaseUrl" Value="$(RecapTVApiBaseUrl)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Web\RecapTV-client.js" />
+    <EmbeddedResource Include="Configuration\configPage.html" Condition="'$(Configuration)' == 'Debug'" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,116 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Jellyfin.Plugin.RecapTV.Configuration;
+using Microsoft.Extensions.Logging;
+
+namespace Jellyfin.Plugin.RecapTV.Services
+{
+    public enum WatchEventResult
+    {
+        Synced,
+        Disabled,
+        Unauthorized,
+        InvalidEvent,
+        Error
+    }
+
+    /// <summary>
+    /// Talks to POST /jellyfin/webhook on RecapTV. Token validity is established lazily:
+    /// there is no separate "verify" endpoint, so a 401 here is what tells us the token is bad.
+    /// </summary>
+    public class RecapTVApiClient
+    {
+        private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+        private readonly HttpClient _httpClient;
+        private readonly ILogger<RecapTVApiClient> _logger;
+
+        public RecapTVApiClient(HttpClient httpClient, ILogger<RecapTVApiClient> logger)
+        {
+            _httpClient = httpClient;
+            _logger = logger;
+        }
+
+        public Task<WatchEventResult> SendMovieWatchedAsync(string token, int? tmdbId, int? tvdbId, string title, string? year, CancellationToken cancellationToken)
+        {
+            return SendAsync(token, new Dictionary<string, object?>
+            {
+                ["type"] = "movie",
+                ["tmdbId"] = tmdbId,
+                ["tvdbId"] = tvdbId,
+                ["title"] = title,
+                ["year"] = year
+            }, cancellationToken);
+        }
+
+        public Task<WatchEventResult> SendEpisodeWatchedAsync(
+            string token,
+            int seriesTvdbId,
+            int episodeTvdbId,
+            string seriesTitle,
+            string? year,
+            CancellationToken cancellationToken)
+        {
+            return SendAsync(token, new Dictionary<string, object?>
+            {
+                ["type"] = "episode",
+                ["seriesTvdbId"] = seriesTvdbId,
+                ["episodeTvdbId"] = episodeTvdbId,
+                ["seriesTitle"] = seriesTitle,
+                ["year"] = year
+            }, cancellationToken);
+        }
+
+        private async Task<WatchEventResult> SendAsync(string token, Dictionary<string, object?> payload, CancellationToken cancellationToken)
+        {
+            var baseUrl = (Plugin.Instance?.Configuration.ApiBaseUrl ?? PluginConfiguration.DefaultApiBaseUrl).TrimEnd('/');
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/jellyfin/webhook")
+            {
+                Content = JsonContent.Create(payload, options: JsonOptions)
+            };
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            try
+            {
+                using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.Unauthorized:
+                        _logger.LogWarning("RecapTV rejected the stored token (401)");
+                        return WatchEventResult.Unauthorized;
+                    case HttpStatusCode.BadRequest:
+                        _logger.LogWarning("RecapTV rejected the watch event payload (400)");
+                        return WatchEventResult.InvalidEvent;
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("RecapTV webhook call failed with status {Status}", response.StatusCode);
+                    return WatchEventResult.Error;
+                }
+
+                var body = await response.Content.ReadFromJsonAsync<WebhookResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+                return body?.Synced == true ? WatchEventResult.Synced : WatchEventResult.Disabled;
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Failed to reach RecapTV at {BaseUrl}", baseUrl);
+                return WatchEventResult.Error;
+            }
+        }
+
+        private sealed class WebhookResponse
+        {
+            public bool Status { get; set; }
+
+            public bool Synced { get; set; }
+        }
+    }
+}
