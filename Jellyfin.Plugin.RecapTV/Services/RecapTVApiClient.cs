@@ -69,7 +69,20 @@ namespace Jellyfin.Plugin.RecapTV.Services
 
         private async Task<WatchEventResult> SendAsync(string token, Dictionary<string, object?> payload, CancellationToken cancellationToken)
         {
-            var baseUrl = (Plugin.Instance?.Configuration.ApiBaseUrl ?? PluginConfiguration.DefaultApiBaseUrl).TrimEnd('/');
+            // Config override only honored in DEBUG (see Plugin.GetPages); Release always uses the build-time default.
+#if DEBUG
+            var configuredUrl = Plugin.Instance?.Configuration.ApiBaseUrl;
+            var baseUrl = string.IsNullOrWhiteSpace(configuredUrl) ? PluginConfiguration.DefaultApiBaseUrl : configuredUrl;
+#else
+            var baseUrl = PluginConfiguration.DefaultApiBaseUrl;
+#endif
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                _logger.LogError("RecapTV API base URL is not configured; dropping watch event");
+                return WatchEventResult.Error;
+            }
+
+            baseUrl = baseUrl.TrimEnd('/');
             using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/jellyfin/webhook")
             {
                 Content = JsonContent.Create(payload, options: JsonOptions)
