@@ -1,1 +1,20 @@
-[]
+[
+    {
+        "guid": "b3f1b6b0-6f0a-4c8b-9a3d-7c2e4f5a9d10",
+        "name": "RecapTV",
+        "description": "Each Jellyfin user connects their own RecapTV (https://my.recaptv.app) account from their profile menu. On completed playback, the plugin reports the watched item to RecapTV, which adds it to the user's watchlist and marks it watched (with optional backfill of earlier episodes). No server-admin setup beyond installing the plugin is required.\n",
+        "overview": "Sync watched movies and episodes from Jellyfin to your RecapTV account.",
+        "owner": "RecapTV",
+        "category": "General",
+        "versions": [
+            {
+                "version": "0.1.0.0",
+                "changelog": "- 0.1.0: initial release - per-user RecapTV connection, playback-complete sync.\n",
+                "targetAbi": "10.11.0.0",
+                "sourceUrl": "https://github.com/RecapTV/jellyfin-plugin/releases/download/v0.1.0/recaptv_0.1.0.0.zip",
+                "checksum": "df0579d19d061a4f1c2b0cd078ea4b86",
+                "timestamp": "2026-08-13T13:46:31Z"
+            }
+        ]
+    }
+]
