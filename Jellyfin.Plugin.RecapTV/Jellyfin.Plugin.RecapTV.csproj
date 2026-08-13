@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Jellyfin.Plugin.RecapTV</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.RecapTV</AssemblyName>
-    <Version>0.1.6</Version>
+    <Version>0.1.7</Version>
     <RecapTVApiBaseUrl Condition="'$(RecapTVApiBaseUrl)' == ''">$(RECAPTV_API_BASE_URL)</RecapTVApiBaseUrl>
   </PropertyGroup>
 
