@@ -12,11 +12,14 @@ namespace Jellyfin.Plugin.RecapTV.Services
     // time via IStartupFilter, instead of rewriting the file on disk. On-disk
     // rewrites need a writable web root (fails on read-only containers) and get
     // wiped on every jellyfin-web update; rewriting the response in-flight avoids
-    // both problems entirely.
+    // both problems entirely. Fragile against some reverse-proxy/CDN setups
+    // (buffered rewrite, header stripping), so this is a fallback: when the
+    // File Transformation plugin is installed, FileTransformationRegistrar
+    // registers the same injection with it instead, which is more broadly
+    // compatible. ScriptInjection.Inject is idempotent, so having both active
+    // is safe.
     public class WebClientInjectorStartupFilter : IStartupFilter
     {
-        private static readonly long CacheBustTicks = DateTime.UtcNow.Ticks;
-
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
         {
             return app =>
@@ -68,12 +71,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
                 html = await reader.ReadToEndAsync().ConfigureAwait(false);
             }
 
-            var bodyClose = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
-            if (html.IndexOf("plugin=\"RecapTV\"", StringComparison.OrdinalIgnoreCase) < 0 && bodyClose >= 0)
-            {
-                var scriptTag = $"<script plugin=\"RecapTV\" src=\"{context.Request.PathBase}/RecapTV/ClientScript.js?v={CacheBustTicks}\" defer></script>";
-                html = html.Substring(0, bodyClose) + scriptTag + "\n" + html.Substring(bodyClose);
-            }
+            html = ScriptInjection.Inject(html, context.Request.PathBase);
 
             var bytes = Encoding.UTF8.GetBytes(html);
             context.Response.ContentType = "text/html;charset=utf-8";
