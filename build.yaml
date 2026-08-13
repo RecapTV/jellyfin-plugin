@@ -15,5 +15,5 @@ owner: "RecapTV"
 artifacts:
   - "Jellyfin.Plugin.RecapTV.dll"
 changelog: >
-  - 0.1.1: version bump.
+  - 0.1.1: repository restructure, no functional changes.
   - 0.1.0: initial release - per-user RecapTV connection, playback-complete sync.
