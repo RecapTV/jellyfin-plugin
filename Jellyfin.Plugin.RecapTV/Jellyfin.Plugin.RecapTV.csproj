@@ -6,13 +6,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Jellyfin.Plugin.RecapTV</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.RecapTV</AssemblyName>
-    <Version>0.1.4</Version>
+    <Version>0.1.5</Version>
     <RecapTVApiBaseUrl Condition="'$(RecapTVApiBaseUrl)' == ''">$(RECAPTV_API_BASE_URL)</RecapTVApiBaseUrl>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Jellyfin.Controller" Version="10.11.11" ExcludeAssets="runtime" />
     <PackageReference Include="Jellyfin.Model" Version="10.11.11" ExcludeAssets="runtime" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" ExcludeAssets="runtime" />
   </ItemGroup>
 
   <ItemGroup>

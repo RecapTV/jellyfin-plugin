@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Jellyfin.Plugin.RecapTV.Configuration;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
+using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 
@@ -10,13 +11,16 @@ namespace Jellyfin.Plugin.RecapTV
 {
     public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
-        public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
+        public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer, IServerConfigurationManager serverConfigurationManager)
             : base(applicationPaths, xmlSerializer)
         {
             Instance = this;
+            ServerConfigurationManager = serverConfigurationManager;
         }
 
         public static Plugin? Instance { get; private set; }
+
+        internal IServerConfigurationManager ServerConfigurationManager { get; }
 
         public override string Name => "RecapTV";
 
