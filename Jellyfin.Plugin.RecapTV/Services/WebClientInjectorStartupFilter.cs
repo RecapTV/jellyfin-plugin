@@ -15,8 +15,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
     // both problems entirely.
     public class WebClientInjectorStartupFilter : IStartupFilter
     {
-        private static readonly string ScriptTag =
-            $"<script plugin=\"RecapTV\" src=\"/RecapTV/ClientScript.js?v={DateTime.UtcNow.Ticks}\" defer></script>";
+        private static readonly long CacheBustTicks = DateTime.UtcNow.Ticks;
 
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
         {
@@ -72,7 +71,8 @@ namespace Jellyfin.Plugin.RecapTV.Services
             var bodyClose = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
             if (html.IndexOf("plugin=\"RecapTV\"", StringComparison.OrdinalIgnoreCase) < 0 && bodyClose >= 0)
             {
-                html = html.Substring(0, bodyClose) + ScriptTag + "\n" + html.Substring(bodyClose);
+                var scriptTag = $"<script plugin=\"RecapTV\" src=\"{context.Request.PathBase}/RecapTV/ClientScript.js?v={CacheBustTicks}\" defer></script>";
+                html = html.Substring(0, bodyClose) + scriptTag + "\n" + html.Substring(bodyClose);
             }
 
             var bytes = Encoding.UTF8.GetBytes(html);
