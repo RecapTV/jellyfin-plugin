@@ -4,6 +4,7 @@ using MediaBrowser.Controller;
 using MediaBrowser.Controller.Events;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Plugins;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.RecapTV
@@ -15,7 +16,7 @@ namespace Jellyfin.Plugin.RecapTV
             serviceCollection.AddSingleton<TokenStore>();
             serviceCollection.AddHttpClient<RecapTVApiClient>();
             serviceCollection.AddScoped<IEventConsumer<PlaybackStopEventArgs>, PlaybackStopNotifier>();
-            serviceCollection.AddHostedService<WebClientInjectorService>();
+            serviceCollection.AddSingleton<IStartupFilter, WebClientInjectorStartupFilter>();
         }
     }
 }
