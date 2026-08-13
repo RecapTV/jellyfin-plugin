@@ -12,7 +12,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
         private const string Marker = "plugin=\"RecapTV\"";
         private static readonly long CacheBustTicks = DateTime.UtcNow.Ticks;
 
-        public static string Inject(string html, string basePath)
+        public static string Inject(string html)
         {
             if (html.IndexOf(Marker, StringComparison.OrdinalIgnoreCase) >= 0)
             {
@@ -25,7 +25,11 @@ namespace Jellyfin.Plugin.RecapTV.Services
                 return html;
             }
 
-            var tag = $"<script {Marker} src=\"{basePath}/RecapTV/ClientScript.js?v={CacheBustTicks}\" defer></script>";
+            // Relative to index.html's own URL (".../web/index.html" or ".../web/"), so
+            // it resolves to ".../RecapTV/ClientScript.js" under whatever prefix the
+            // request actually arrived under - no need to know Jellyfin's configured
+            // Base URL or track reverse-proxy/tunnel path rewriting ourselves.
+            var tag = $"<script {Marker} src=\"../RecapTV/ClientScript.js?v={CacheBustTicks}\" defer></script>";
             return html.Substring(0, bodyClose) + tag + "\n" + html.Substring(bodyClose);
         }
     }

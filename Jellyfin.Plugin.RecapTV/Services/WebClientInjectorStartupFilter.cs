@@ -71,7 +71,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
                 html = await reader.ReadToEndAsync().ConfigureAwait(false);
             }
 
-            html = ScriptInjection.Inject(html, context.Request.PathBase);
+            html = ScriptInjection.Inject(html);
 
             var bytes = Encoding.UTF8.GetBytes(html);
             context.Response.ContentType = "text/html;charset=utf-8";
