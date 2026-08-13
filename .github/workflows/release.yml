@@ -31,7 +31,7 @@ jobs:
 
       - name: Build plugin package
         env:
-          RECAPTV_API_BASE_URL: ${{ vars.RECAPTV_API_BASE_URL }}
+          RECAPTV_API_BASE_URL: ${{ secrets.RECAPTV_API_BASE_URL }}
         run: |
           mkdir -p artifacts
           jprm plugin build . --output ./artifacts --version "${{ steps.version.outputs.version }}" --dotnet-configuration Release
