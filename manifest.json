@@ -8,6 +8,14 @@
         "category": "General",
         "versions": [
             {
+                "version": "0.1.2.0",
+                "changelog": "- 0.1.2: fix client script injection to use request-time middleware instead of\n  rewriting index.html on disk, avoiding permission failures on read-only web\n  roots (e.g. some Docker setups).\n- 0.1.1: repository restructure, no functional changes. - 0.1.0: initial release - per-user RecapTV connection, playback-complete sync.\n",
+                "targetAbi": "10.11.0.0",
+                "sourceUrl": "https://github.com/RecapTV/jellyfin-plugin/releases/download/v0.1.2/recaptv_0.1.2.0.zip",
+                "checksum": "b153d437b382880a07fe9229ce69703b",
+                "timestamp": "2026-08-13T14:23:14Z"
+            },
+            {
                 "version": "0.1.0.0",
                 "changelog": "- 0.1.0: initial release - per-user RecapTV connection, playback-complete sync.\n",
                 "targetAbi": "10.11.0.0",
