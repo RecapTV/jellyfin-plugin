@@ -52,8 +52,10 @@ namespace Jellyfin.Plugin.RecapTV.Services
 
         public Task<WatchEventResult> SendEpisodeWatchedAsync(
             string token,
-            int seriesTvdbId,
-            int episodeTvdbId,
+            int? seriesTvdbId,
+            int? episodeTvdbId,
+            int? seriesTmdbId,
+            int? episodeTmdbId,
             string seriesTitle,
             string? year,
             CancellationToken cancellationToken)
@@ -63,6 +65,8 @@ namespace Jellyfin.Plugin.RecapTV.Services
                 ["type"] = "episode",
                 ["seriesTvdbId"] = seriesTvdbId,
                 ["episodeTvdbId"] = episodeTvdbId,
+                ["seriesTmdbId"] = seriesTmdbId,
+                ["episodeTmdbId"] = episodeTmdbId,
                 ["seriesTitle"] = seriesTitle,
                 ["year"] = year
             }, cancellationToken);
@@ -79,7 +83,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
 #endif
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
-                _logger.LogError("RecapTV API base URL is not configured; dropping watch event");
+                _logger.LogError("[RecapTV] API base URL is not configured; dropping watch event");
                 return WatchEventResult.Error;
             }
 
@@ -98,16 +102,17 @@ namespace Jellyfin.Plugin.RecapTV.Services
                 switch (response.StatusCode)
                 {
                     case HttpStatusCode.Unauthorized:
-                        _logger.LogWarning("RecapTV rejected the stored token (401)");
+                        _logger.LogWarning("[RecapTV] Rejected the stored token (401)");
                         return WatchEventResult.Unauthorized;
                     case HttpStatusCode.BadRequest:
-                        _logger.LogWarning("RecapTV rejected the watch event payload (400)");
+                        var errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                        _logger.LogWarning("[RecapTV] Rejected the watch event payload (400): {Body}", errorBody);
                         return WatchEventResult.InvalidEvent;
                 }
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogError("RecapTV webhook call failed with status {Status}", response.StatusCode);
+                    _logger.LogError("[RecapTV] Webhook call failed with status {Status}", response.StatusCode);
                     return WatchEventResult.Error;
                 }
 
@@ -116,7 +121,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogError(ex, "Failed to reach RecapTV at {BaseUrl}", baseUrl);
+                _logger.LogError(ex, "[RecapTV] Failed to reach {BaseUrl}", baseUrl);
                 return WatchEventResult.Error;
             }
         }
