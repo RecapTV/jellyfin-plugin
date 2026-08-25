@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -83,9 +84,10 @@ namespace Jellyfin.Plugin.RecapTV.Services
             }
 
             baseUrl = baseUrl.TrimEnd('/');
+            var nonNullPayload = payload.Where(kvp => kvp.Value is not null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/jellyfin/webhook")
             {
-                Content = JsonContent.Create(payload, options: JsonOptions)
+                Content = JsonContent.Create(nonNullPayload, options: JsonOptions)
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
