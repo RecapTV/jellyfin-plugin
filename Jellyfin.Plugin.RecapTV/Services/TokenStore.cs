@@ -85,7 +85,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
             }
             catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
             {
-                _logger.LogWarning(ex, "Failed to read RecapTV token store at {Path}, starting empty", _filePath);
+                _logger.LogWarning(ex, "[RecapTV] Failed to read token store at {Path}, starting empty", _filePath);
                 return new Dictionary<string, TokenRecord>();
             }
         }
@@ -98,7 +98,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                _logger.LogError(ex, "Failed to write RecapTV token store at {Path}", _filePath);
+                _logger.LogError(ex, "[RecapTV] Failed to write token store at {Path}", _filePath);
             }
         }
     }

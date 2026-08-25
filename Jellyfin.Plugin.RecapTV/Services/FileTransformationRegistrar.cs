@@ -5,6 +5,7 @@ using System.Runtime.Loader;
 using System.Threading;
 using System.Threading.Tasks;
 using MediaBrowser.Model.Tasks;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
 namespace Jellyfin.Plugin.RecapTV.Services
@@ -22,6 +23,15 @@ namespace Jellyfin.Plugin.RecapTV.Services
     // Transformation's own consumers (e.g. jellyfin-plugin-pages).
     public class FileTransformationRegistrar : IScheduledTask
     {
+        private readonly ILogger<FileTransformationRegistrar> _logger;
+        private readonly ILoggerFactory _loggerFactory;
+
+        public FileTransformationRegistrar(ILogger<FileTransformationRegistrar> logger, ILoggerFactory loggerFactory)
+        {
+            _logger = logger;
+            _loggerFactory = loggerFactory;
+        }
+
         public string Name => "RecapTV File Transformation Registration";
 
         public string Key => "Jellyfin.Plugin.RecapTV.FileTransformationRegistrar";
@@ -40,18 +50,31 @@ namespace Jellyfin.Plugin.RecapTV.Services
                 .GetType("Jellyfin.Plugin.FileTransformation.PluginInterface")?
                 .GetMethod("RegisterTransformation");
 
-            if (registerMethod is not null)
+            if (registerMethod is null)
             {
-                var payload = new JObject
-                {
-                    ["id"] = "b3f1b6b0-6f0a-4c8b-9a3d-7c2e4f5a9d11",
-                    ["fileNamePattern"] = "index.html",
-                    ["callbackAssembly"] = GetType().Assembly.FullName,
-                    ["callbackClass"] = typeof(FileTransformationPatches).FullName,
-                    ["callbackMethod"] = nameof(FileTransformationPatches.IndexHtml)
-                };
+                _logger.LogInformation("[RecapTV] File Transformation plugin not found; falling back to IStartupFilter middleware for script injection");
+                return Task.CompletedTask;
+            }
 
+            FileTransformationPatches.Logger = _loggerFactory.CreateLogger(typeof(FileTransformationPatches));
+
+            var payload = new JObject
+            {
+                ["id"] = "b3f1b6b0-6f0a-4c8b-9a3d-7c2e4f5a9d11",
+                ["fileNamePattern"] = "index.html",
+                ["callbackAssembly"] = GetType().Assembly.FullName,
+                ["callbackClass"] = typeof(FileTransformationPatches).FullName,
+                ["callbackMethod"] = nameof(FileTransformationPatches.IndexHtml)
+            };
+
+            try
+            {
                 registerMethod.Invoke(null, new object?[] { payload });
+                _logger.LogInformation("[RecapTV] Registered index.html script injection with the File Transformation plugin");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[RecapTV] Failed to register with the File Transformation plugin; falling back to IStartupFilter middleware");
             }
 
             return Task.CompletedTask;

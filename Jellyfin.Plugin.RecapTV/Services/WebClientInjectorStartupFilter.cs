@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.RecapTV.Services
 {
@@ -20,16 +21,23 @@ namespace Jellyfin.Plugin.RecapTV.Services
     // is safe.
     public class WebClientInjectorStartupFilter : IStartupFilter
     {
+        private readonly ILogger<WebClientInjectorStartupFilter> _logger;
+
+        public WebClientInjectorStartupFilter(ILogger<WebClientInjectorStartupFilter> logger)
+        {
+            _logger = logger;
+        }
+
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
         {
             return app =>
             {
-                app.Use(InvokeAsync);
+                app.Use((context, nextDelegate) => InvokeAsync(context, nextDelegate, _logger));
                 next(app);
             };
         }
 
-        private static async Task InvokeAsync(HttpContext context, Func<Task> next)
+        private static async Task InvokeAsync(HttpContext context, Func<Task> next, ILogger logger)
         {
             if (!HttpMethods.IsGet(context.Request.Method) || !IsIndexRequest(context.Request.Path.Value))
             {
@@ -71,7 +79,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
                 html = await reader.ReadToEndAsync().ConfigureAwait(false);
             }
 
-            html = ScriptInjection.Inject(html);
+            html = ScriptInjection.Inject(html, logger);
 
             var bytes = Encoding.UTF8.GetBytes(html);
             context.Response.ContentType = "text/html;charset=utf-8";

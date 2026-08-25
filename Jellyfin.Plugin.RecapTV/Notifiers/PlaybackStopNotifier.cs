@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.RecapTV.Services;
@@ -11,10 +12,9 @@ namespace Jellyfin.Plugin.RecapTV.Notifiers
 {
     /// <summary>
     /// Fires on every completed-or-not playback stop, for every user watching that session.
-    /// Movies send whichever of TMDB/TVDB ids Jellyfin has (stock movie metadata usually only
-    /// sets Tmdb, not Tvdb - TheTVDB only matches TV series/episodes by default); episodes need
-    /// TVDB ids on both the episode and its series. Only items with at least one usable id and a
-    /// connected RecapTV token do anything.
+    /// Sends whichever of TMDB/TVDB ids Jellyfin has for the item (and, for episodes, its
+    /// series) - only items with at least one usable id pair and a connected RecapTV token
+    /// do anything.
     /// </summary>
     public class PlaybackStopNotifier : IEventConsumer<PlaybackStopEventArgs>
     {
@@ -33,6 +33,11 @@ namespace Jellyfin.Plugin.RecapTV.Notifiers
         {
             if (!eventArgs.PlayedToCompletion || eventArgs.Item is null || eventArgs.Users.Count == 0)
             {
+                _logger.LogInformation(
+                    "[RecapTV] Ignoring playback stop: playedToCompletion={PlayedToCompletion}, item={Item}, users={Users}",
+                    eventArgs.PlayedToCompletion,
+                    eventArgs.Item?.Name,
+                    eventArgs.Users.Count);
                 return;
             }
 
@@ -41,6 +46,7 @@ namespace Jellyfin.Plugin.RecapTV.Notifiers
                 var record = _tokenStore.Get(user.Id);
                 if (record is null)
                 {
+                    _logger.LogInformation("[RecapTV] Skipping user {UserId}: no RecapTV token stored", user.Id);
                     continue;
                 }
 
@@ -51,44 +57,83 @@ namespace Jellyfin.Plugin.RecapTV.Notifiers
                     _ => (WatchEventResult?)null
                 };
 
+                _logger.LogInformation("[RecapTV] Watch event result for user {UserId}, item {Item}: {Result}", user.Id, eventArgs.Item.Name, result);
+
                 if (result == WatchEventResult.Unauthorized)
                 {
+                    _logger.LogWarning("[RecapTV] Token for user {UserId} was rejected; marking invalid", user.Id);
                     _tokenStore.MarkInvalid(user.Id, "RecapTV rejected the token. Reconnect from your profile menu.");
                 }
             }
         }
 
+        private static int? TryGetProviderId(Dictionary<string, string> providerIds, string key)
+        {
+            return providerIds.TryGetValue(key, out var raw) && int.TryParse(raw, out var parsed) ? parsed : null;
+        }
+
         private Task<WatchEventResult> SendMovieAsync(string token, Movie movie)
         {
-            int? tmdbId = movie.ProviderIds.TryGetValue("Tmdb", out var rawTmdb) && int.TryParse(rawTmdb, out var parsedTmdb)
-                ? parsedTmdb
-                : null;
-            int? tvdbId = movie.ProviderIds.TryGetValue("Tvdb", out var rawTvdb) && int.TryParse(rawTvdb, out var parsedTvdb)
-                ? parsedTvdb
-                : null;
+            int? tmdbId = TryGetProviderId(movie.ProviderIds, "Tmdb");
+            int? tvdbId = TryGetProviderId(movie.ProviderIds, "Tvdb");
 
             if (tmdbId is null && tvdbId is null)
             {
-                _logger.LogDebug("Skipping movie {Name}: no TMDB or TVDB id", movie.Name);
+                _logger.LogInformation("[RecapTV] Skipping movie {Name}: no TMDB or TVDB id", movie.Name);
                 return Task.FromResult(WatchEventResult.InvalidEvent);
             }
 
+            _logger.LogInformation("[RecapTV] Sending movie {Name} (tmdbId={TmdbId}, tvdbId={TvdbId}, year={Year})", movie.Name, tmdbId, tvdbId, movie.ProductionYear);
             return _apiClient.SendMovieWatchedAsync(token, tmdbId, tvdbId, movie.Name, movie.ProductionYear?.ToString(), CancellationToken.None);
         }
 
         private Task<WatchEventResult> SendEpisodeAsync(string token, Episode episode)
         {
             var series = episode.Series;
-            if (series is null
-                || !series.ProviderIds.TryGetValue("Tvdb", out var rawSeries) || !int.TryParse(rawSeries, out var seriesTvdbId)
-                || !episode.ProviderIds.TryGetValue("Tvdb", out var rawEpisode) || !int.TryParse(rawEpisode, out var episodeTvdbId))
+            if (series is null)
             {
-                _logger.LogDebug("Skipping episode {Name}: missing series/episode TVDB id", episode.Name);
+                _logger.LogInformation("[RecapTV] Skipping episode {Name}: no series", episode.Name);
+                return Task.FromResult(WatchEventResult.InvalidEvent);
+            }
+
+            int? seriesTvdbId = TryGetProviderId(series.ProviderIds, "Tvdb");
+            int? episodeTvdbId = TryGetProviderId(episode.ProviderIds, "Tvdb");
+            int? seriesTmdbId = TryGetProviderId(series.ProviderIds, "Tmdb");
+            int? episodeTmdbId = TryGetProviderId(episode.ProviderIds, "Tmdb");
+
+            var haveTvdbPair = seriesTvdbId is not null && episodeTvdbId is not null;
+            var haveTmdbPair = seriesTmdbId is not null && episodeTmdbId is not null;
+            if (!haveTvdbPair && !haveTmdbPair)
+            {
+                _logger.LogInformation("[RecapTV] Skipping episode {Name}: missing series/episode id pair on both TVDB and TMDB", episode.Name);
                 return Task.FromResult(WatchEventResult.InvalidEvent);
             }
 
             var seriesTitle = series.Name ?? episode.SeriesName;
-            return _apiClient.SendEpisodeWatchedAsync(token, seriesTvdbId, episodeTvdbId, seriesTitle, series.ProductionYear?.ToString(), CancellationToken.None);
+            var sendSeriesTvdbId = haveTvdbPair ? seriesTvdbId : null;
+            var sendEpisodeTvdbId = haveTvdbPair ? episodeTvdbId : null;
+            var sendSeriesTmdbId = haveTmdbPair ? seriesTmdbId : null;
+            var sendEpisodeTmdbId = haveTmdbPair ? episodeTmdbId : null;
+
+            _logger.LogInformation(
+                "[RecapTV] Sending episode {Name} of {Series} (seriesTvdbId={SeriesTvdbId}, episodeTvdbId={EpisodeTvdbId}, seriesTmdbId={SeriesTmdbId}, episodeTmdbId={EpisodeTmdbId}, year={Year})",
+                episode.Name,
+                seriesTitle,
+                sendSeriesTvdbId,
+                sendEpisodeTvdbId,
+                sendSeriesTmdbId,
+                sendEpisodeTmdbId,
+                series.ProductionYear);
+
+            return _apiClient.SendEpisodeWatchedAsync(
+                token,
+                sendSeriesTvdbId,
+                sendEpisodeTvdbId,
+                sendSeriesTmdbId,
+                sendEpisodeTmdbId,
+                seriesTitle,
+                series.ProductionYear?.ToString(),
+                CancellationToken.None);
         }
     }
 }

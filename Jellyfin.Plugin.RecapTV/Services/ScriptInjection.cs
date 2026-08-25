@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.RecapTV.Services
 {
@@ -12,7 +13,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
         private const string Marker = "plugin=\"RecapTV\"";
         private static readonly long CacheBustTicks = DateTime.UtcNow.Ticks;
 
-        public static string Inject(string html)
+        public static string Inject(string html, ILogger? logger = null)
         {
             if (html.IndexOf(Marker, StringComparison.OrdinalIgnoreCase) >= 0)
             {
@@ -22,6 +23,7 @@ namespace Jellyfin.Plugin.RecapTV.Services
             var bodyClose = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
             if (bodyClose < 0)
             {
+                logger?.LogWarning("[RecapTV] No </body> tag found in {Length}-byte HTML, cannot inject script tag", html.Length);
                 return html;
             }
 
